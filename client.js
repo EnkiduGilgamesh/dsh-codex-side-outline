@@ -4,22 +4,27 @@
 // (conversation) column, adjacent to the sidebar: one gray short line per
 // conversation turn, stacked top-to-bottom.
 //
-// - Hover a line: it highlights and shows a summary card (first line = user
-//   question; up to 3 lines of ~20 chars = the agent's final reply only).
+// - Hover a line: its length grows to the longest of 5 levels, with neighbors
+//   stepping down in both directions; a summary card shows the user question
+//   and the agent's final reply.
 // - Click a line: the conversation scrolls to that turn's user message.
+// - When there are too many turns, up/down pager buttons scroll the rail.
 //
 // Placement: `shell.overlay` (frame-wide floating layer). The rail's
 // horizontal offset is measured from the frame's first grid column (the
 // sidebar) at runtime, so it tracks sidebar drag / collapse / window-resize.
-// Conversation data comes from the client `sessions` service: `useSessions`
-// yields the current session id, and `sessions.binding(id).session` exposes an
-// ObservableSnapshot whose `getSnapshot().nodes` carries the folded
-// ConversationNode list.
+// Conversation data comes from the client `sessions` service.
 
 import * as React from 'react'
 
 const PER = 20
 const GAP = 6
+
+// Five marker lengths, from the hovered turn (longest) out to the idle
+// default (shortest). The default is deliberately shorter than the original.
+const WIDTHS = [40, 33, 26, 20, 14]
+const ITEM_H = 14 // uniform row height so the card offset is deterministic
+const BTN_H = 20 // pager button height (also the card's top offset when shown)
 
 function textOfBlocks(blocks) {
   if (!blocks) return ''
@@ -111,11 +116,15 @@ function scrollToKey(key) {
 }
 
 const css = [
-  '.dso-outline-rail{position:absolute;top:50%;transform:translateY(-50%);display:flex;flex-direction:column;align-items:flex-start;gap:7px;z-index:9990;pointer-events:auto;}',
-  '.dso-outline-item{position:relative;display:flex;align-items:center;padding:2px 0;cursor:pointer;}',
-  '.dso-outline-line{width:26px;height:3px;border-radius:2px;background:var(--dsw-alias-label-secondary);opacity:.45;transition:width .12s ease,opacity .12s ease,background .12s ease;}',
-  '.dso-outline-item:hover .dso-outline-line,.dso-outline-item.is-hover .dso-outline-line{width:42px;height:4px;opacity:1;background:var(--dsw-alias-brand-primary);}',
-  '.dso-outline-card{position:absolute;left:50px;top:50%;transform:translateY(-50%);min-width:150px;max-width:190px;padding:8px 10px;background:var(--dsw-alias-bg-overlay);border:1px solid var(--dsw-alias-border-l1);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.22);z-index:9991;font-size:12px;line-height:1.5;}',
+  '.dso-outline-rail{position:absolute;top:50%;transform:translateY(-50%);display:flex;flex-direction:column;align-items:flex-start;z-index:9990;pointer-events:auto;}',
+  '.dso-outline-list{display:flex;flex-direction:column;overflow-y:auto;scrollbar-width:none;max-height:min(60vh,420px);}',
+  '.dso-outline-list::-webkit-scrollbar{display:none;}',
+  '.dso-outline-item{position:relative;display:flex;align-items:center;height:' + ITEM_H + 'px;cursor:pointer;}',
+  '.dso-outline-line{height:4px;border-radius:2px;background:var(--dsw-alias-label-secondary);opacity:.45;transition:width .18s cubic-bezier(.2,.8,.2,1),background-color .18s ease,opacity .18s ease;}',
+  '.dso-outline-btn{width:24px;height:' + BTN_H + 'px;margin:0;padding:0;border:none;background:transparent;color:var(--dsw-alias-label-secondary);opacity:.7;cursor:pointer;font-size:11px;line-height:1;display:flex;align-items:center;justify-content:flex-start;transition:opacity .12s ease;}',
+  '.dso-outline-btn:hover{opacity:1;}',
+  '.dso-outline-btn:disabled{opacity:.2;cursor:default;}',
+  '.dso-outline-card{position:absolute;left:52px;transform:translateY(-50%);min-width:150px;max-width:190px;padding:8px 10px;background:var(--dsw-alias-bg-overlay);border:1px solid var(--dsw-alias-border-l1);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.22);z-index:9991;font-size:12px;line-height:1.5;pointer-events:none;}',
   '.dso-outline-q{color:var(--dsw-alias-label-primary);font-weight:600;border-left:2px solid var(--dsw-alias-brand-primary);padding-left:6px;margin-bottom:4px;word-break:break-all;}',
   '.dso-outline-a{color:var(--dsw-alias-label-secondary);padding-left:8px;word-break:break-all;}'
 ].join('\n')
@@ -141,7 +150,7 @@ export function apply(ctx) {
     for (let i = 0; i < a.length; i++) {
       children.push(React.createElement('div', { key: 'a' + i, className: 'dso-outline-a' }, a[i]))
     }
-    return React.createElement('div', { className: 'dso-outline-card' }, children)
+    return React.createElement('div', { className: 'dso-outline-card', style: { top: props.top + 'px' } }, children)
   }
 
   function Outline(props) {
@@ -149,7 +158,10 @@ export function apply(ctx) {
     const [turns, setTurns] = React.useState([])
     const [hover, setHover] = React.useState(-1)
     const [left, setLeft] = React.useState(286)
+    const [overflow, setOverflow] = React.useState(false)
+    const [scroll, setScroll] = React.useState({ top: 0, atTop: true, atBottom: false })
     const railRef = React.useRef(null)
+    const listRef = React.useRef(null)
     const hasTurns = turns.length > 0
 
     React.useEffect(() => {
@@ -199,20 +211,77 @@ export function apply(ctx) {
       return () => { if (dispose) dispose() }
     }, [hasTurns])
 
+    React.useEffect(() => {
+      const el = listRef.current
+      if (el) setOverflow(el.scrollHeight > el.clientHeight)
+    }, [turns])
+
     if (!hasTurns) return null
 
-    const items = turns.map((t, i) => React.createElement('div', {
-      key: i,
-      className: 'dso-outline-item' + (i === hover ? ' is-hover' : ''),
-      onMouseEnter: () => setHover(i),
-      onMouseLeave: () => setHover(-1),
-      onClick: () => scrollToKey(t.key),
-    },
-      React.createElement('div', { className: 'dso-outline-line' }),
-      i === hover ? React.createElement(Card, { turn: t }) : null,
-    ))
+    const handleScroll = () => {
+      const el = listRef.current
+      if (!el) return
+      setScroll({
+        top: el.scrollTop,
+        atTop: el.scrollTop <= 0,
+        atBottom: el.scrollTop + el.clientHeight >= el.scrollHeight - 1,
+      })
+    }
 
-    return React.createElement('div', { ref: railRef, className: 'dso-outline-rail', style: { left: left + 'px' } }, items)
+    const page = (dir) => {
+      const el = listRef.current
+      if (el) el.scrollBy({ top: dir * el.clientHeight * 0.9, behavior: 'smooth' })
+    }
+
+    const items = turns.map((t, i) => {
+      const level = hover < 0 ? WIDTHS.length - 1 : Math.min(Math.abs(i - hover), WIDTHS.length - 1)
+      const isHover = i === hover
+      return React.createElement('div', {
+        key: i,
+        className: 'dso-outline-item',
+        onMouseEnter: () => setHover(i),
+        onClick: () => scrollToKey(t.key),
+      },
+        React.createElement('div', {
+          className: 'dso-outline-line',
+          style: {
+            width: WIDTHS[level] + 'px',
+            background: isHover ? 'var(--dsw-alias-brand-primary)' : undefined,
+            opacity: isHover ? 1 : undefined,
+          },
+        }),
+      )
+    })
+
+    const topButton = overflow ? React.createElement('button', {
+      className: 'dso-outline-btn',
+      disabled: scroll.atTop,
+      onMouseEnter: () => setHover(-1),
+      onClick: () => page(-1),
+    }, '\u25B2') : null
+
+    const bottomButton = overflow ? React.createElement('button', {
+      className: 'dso-outline-btn',
+      disabled: scroll.atBottom,
+      onMouseEnter: () => setHover(-1),
+      onClick: () => page(1),
+    }, '\u25BC') : null
+
+    const cardTop = hover >= 0
+      ? (overflow ? BTN_H : 0) + hover * ITEM_H + ITEM_H / 2 - scroll.top
+      : 0
+
+    return React.createElement('div', {
+      ref: railRef,
+      className: 'dso-outline-rail',
+      style: { left: left + 'px' },
+      onMouseLeave: () => setHover(-1),
+    },
+      topButton,
+      React.createElement('div', { ref: listRef, className: 'dso-outline-list', onScroll: handleScroll }, items),
+      bottomButton,
+      hover >= 0 ? React.createElement(Card, { turn: turns[hover], top: cardTop }) : null,
+    )
   }
 
   ctx.slots.inject('shell.overlay', () => ctx.slots.register(
