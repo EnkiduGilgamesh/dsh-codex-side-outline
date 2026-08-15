@@ -1,18 +1,22 @@
 // conversation-outline — Dynamic Cordis Plugin (Client half)
 //
 // This file is the `code.client` function body for the `outln-*` Plugin. It
-// renders a hoverable left rail over the current session: one gray short line
-// per conversation turn, stacked top-to-bottom. Hovering a line highlights it
-// and reveals a summary card whose first line is the user question and whose
-// remaining lines (up to 3, ~20 characters each) are the agent reply.
+// renders a hoverable rail along the LEFT EDGE OF THE CENTER (conversation)
+// COLUMN, adjacent to the sidebar: one gray short line per conversation turn,
+// stacked top-to-bottom. Hovering a line highlights it and reveals a summary
+// card whose first line is the user question and whose remaining lines (up to
+// 3, ~20 characters each) are the agent reply.
 //
-// Placement: `shell.overlay` (frame-wide floating layer) so `position: fixed`
-// stays outside every column's scroll container. Conversation data is read
+// Placement: `shell.overlay` (frame-wide floating layer) so the rail stays
+// outside every column's scroll container. The rail's horizontal offset is
+// measured from the frame's first grid column (the sidebar) at runtime, so it
+// tracks sidebar drag / collapse / window-resize. Conversation data is read
 // through the `sessions` service: `useSessions` yields the current session id,
 // `sessions.binding(id).session` exposes an ObservableSnapshot whose
 // `getSnapshot().nodes` carries the folded ConversationNode list.
 
 const PER = 20
+const GAP = 6
 
 function textOfBlocks(blocks) {
   if (!blocks) return ''
@@ -69,7 +73,7 @@ function clampLines(text, perLine, maxLines) {
 }
 
 const css = [
-  '.dso-outline-rail{position:fixed;left:6px;top:50%;transform:translateY(-50%);display:flex;flex-direction:column;align-items:flex-start;gap:7px;z-index:9990;pointer-events:auto;}',
+  '.dso-outline-rail{position:absolute;top:50%;transform:translateY(-50%);display:flex;flex-direction:column;align-items:flex-start;gap:7px;z-index:9990;pointer-events:auto;}',
   '.dso-outline-item{position:relative;display:flex;align-items:center;padding:2px 0;}',
   '.dso-outline-line{width:26px;height:3px;border-radius:2px;background:var(--dsw-alias-label-secondary);opacity:.45;transition:width .12s ease,opacity .12s ease,background .12s ease;}',
   '.dso-outline-item.is-hover .dso-outline-line{width:42px;height:4px;opacity:1;background:var(--dsw-alias-brand-primary);}',
@@ -83,6 +87,7 @@ return {
     const slots = ctx.get('slots')
     if (slots === undefined) return
     const sessionsSvc = ctx.get('sessions')
+    const timerSvc = ctx.get('timer')
 
     styles.insert(css)
 
@@ -101,6 +106,9 @@ return {
       const currentId = props.useSessions((s) => s.current)
       const [turns, setTurns] = React.useState([])
       const [hover, setHover] = React.useState(-1)
+      const [left, setLeft] = React.useState(286)
+      const railRef = React.useRef(null)
+      const hasTurns = turns.length > 0
 
       React.useEffect(() => {
         if (!currentId || !sessionsSvc) {
@@ -124,7 +132,32 @@ return {
         return face.subscribe(read)
       }, [currentId])
 
-      if (!turns.length) return null
+      React.useEffect(() => {
+        if (!hasTurns) return
+        const measure = () => {
+          const el = railRef.current
+          if (!el) return
+          const frame = el.parentElement && el.parentElement.parentElement
+          if (!frame) return
+          let w = 0
+          const col = frame.firstElementChild
+          if (col && typeof col.getBoundingClientRect === 'function') {
+            w = col.getBoundingClientRect().width
+          }
+          if (!w && frame.style && frame.style.gridTemplateColumns) {
+            w = parseFloat(frame.style.gridTemplateColumns) || 0
+          }
+          if (w > 0) setLeft((prev) => (prev === w + GAP ? prev : w + GAP))
+        }
+        measure()
+        let dispose
+        if (timerSvc && typeof timerSvc.interval === 'function') {
+          dispose = timerSvc.interval(measure, 350)
+        }
+        return () => { if (dispose) dispose() }
+      }, [hasTurns])
+
+      if (!hasTurns) return null
 
       const items = turns.map((t, i) => React.createElement('div', {
         key: i,
@@ -136,7 +169,7 @@ return {
         i === hover ? React.createElement(Card, { turn: t }) : null,
       ))
 
-      return React.createElement('div', { className: 'dso-outline-rail' }, items)
+      return React.createElement('div', { ref: railRef, className: 'dso-outline-rail', style: { left: left + 'px' } }, items)
     }
 
     slots.inject('shell.overlay', () => slots.register(
