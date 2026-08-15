@@ -1,4 +1,4 @@
-// dsh-conversation-outline — browser (client) half.
+// dsh-codex-side-outline — browser (client) half.
 //
 // Renders a hoverable + clickable rail along the LEFT EDGE of the center
 // (conversation) column, adjacent to the sidebar: one gray short line per
@@ -127,7 +127,7 @@ export function apply(ctx) {
 
   ctx.effect(() => {
     const style = document.createElement('style')
-    style.dataset.plugin = 'dsh-conversation-outline'
+    style.dataset.plugin = 'dsh-codex-side-outline'
     style.textContent = css
     document.head.appendChild(style)
     return () => style.remove()
@@ -216,7 +216,7 @@ export function apply(ctx) {
   }
 
   ctx.slots.inject('shell.overlay', () => ctx.slots.register(
-    { name: 'shell.overlay', id: 'conversation-outline', order: 0 },
+    { name: 'shell.overlay', id: 'codex-side-outline', order: 0 },
     (props) => React.createElement(Outline, { useSessions: props.useSessions }),
   ))
 }

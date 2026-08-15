@@ -1,4 +1,4 @@
-# dsh-conversation-outline
+# dsh-codex-side-outline
 
 A Codex-style side outline for the DeepSeek Harness chat column. It extracts an
 outline of the current conversation and shows it as a thin rail along the left
@@ -38,19 +38,19 @@ Install into a profile with the `dsh` CLI (from a directory containing this
 package):
 
 ```sh
-dsh plugin --profile demo add ./dsh-conversation-outline
+dsh plugin --profile demo add ./dsh-codex-side-outline
 ```
 
 Or install straight from a git host:
 
 ```sh
-dsh plugin --profile demo add github:you/dsh-conversation-outline
+dsh plugin --profile demo add github:you/dsh-codex-side-outline
 ```
 
 Then boot:
 
 ```sh
-dsh --profile demo --dump-config   # shows a "# == dsh-conversation-outline" layer
+dsh --profile demo --dump-config   # shows a "# == dsh-codex-side-outline" layer
 dsh --profile demo
 ```
 

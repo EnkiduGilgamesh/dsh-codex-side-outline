@@ -1,5 +1,5 @@
 {
-  "name": "dsh-conversation-outline",
+  "name": "dsh-codex-side-outline",
   "version": "1.0.0",
   "description": "DeepSeek Harness plugin: a hoverable/clickable outline rail on the left of the chat column (one marker per turn, summary card on hover, click to jump).",
   "type": "module",

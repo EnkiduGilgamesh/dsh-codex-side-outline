@@ -1,4 +1,4 @@
-# The dsh-conversation-outline bundle patch.
+# The dsh-codex-side-outline bundle patch.
 #
 # Applied after the base/web layers. The row references this package by name so
 # Node resolution finds the installed code: the host half is a no-op entry
@@ -6,5 +6,5 @@
 # package's `dsh.client` manifest.
 
 - insert:
-    - id: conversation-outline
-      name: dsh-conversation-outline
+    - id: codex-side-outline
+      name: dsh-codex-side-outline
