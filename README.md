@@ -11,8 +11,9 @@ sidebar.
 - **Hover to inspect** — hovering a line highlights it (longer, thicker, brand
   colored) and opens a summary card:
   - first line = the user question (bold, brand accent bar);
-  - following lines = the agent reply, wrapped to about 3 lines of ~20
-    characters each (older content is ellipsized).
+  - following lines = the agent's **final** reply only (thinking/chain-of-thought
+    and intermediate narration before tool calls are excluded), wrapped to
+    about 3 lines of ~20 characters each (older content is ellipsized).
 - **Click to jump** — clicking a line scrolls the conversation to that turn's
   user message.
 

@@ -75,7 +75,8 @@ function buildTurns(snapshot) {
         current = { question: '', reply: text, key: keyBySeq.get(n.seq) || '' }
         turns.push(current)
       } else {
-        current.reply = current.reply ? current.reply + ' ' + text : text
+        // Keep only the final reply of the turn, not intermediate narration before tool calls.
+        current.reply = text
       }
     }
   }
