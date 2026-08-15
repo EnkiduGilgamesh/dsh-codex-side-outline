@@ -105,7 +105,7 @@ window.__ModuleLoader__.load({
     }
 
     const css = [
-      '.dso-outline-rail{position:absolute;top:50%;transform:translateY(-50%);display:flex;flex-direction:column;align-items:flex-start;z-index:9990;pointer-events:auto;}',
+      '.dso-outline-rail{position:absolute;left:286px;top:50%;transform:translateY(-50%);display:flex;flex-direction:column;align-items:flex-start;z-index:9990;pointer-events:auto;}',
       '.dso-outline-list{display:flex;flex-direction:column;overflow-y:auto;scrollbar-width:none;max-height:min(60vh,420px);}',
       '.dso-outline-list::-webkit-scrollbar{display:none;}',
       '.dso-outline-item{position:relative;display:flex;align-items:center;height:' + ITEM_H + 'px;cursor:pointer;}',
@@ -144,7 +144,6 @@ window.__ModuleLoader__.load({
         const currentId = props.useSessions((s) => s.current)
         const [turns, setTurns] = React.useState([])
         const [hover, setHover] = React.useState(-1)
-        const [left, setLeft] = React.useState(286)
         const [overflow, setOverflow] = React.useState(false)
         const [scroll, setScroll] = React.useState({ top: 0, atTop: true, atBottom: false })
         const [isTrajectory, setIsTrajectory] = React.useState(false)
@@ -188,7 +187,7 @@ window.__ModuleLoader__.load({
         React.useEffect(() => {
           if (!hasTurns) return
 
-          const check = () => {
+          const measure = () => {
             if (typeof document === 'undefined') return
             // Find the frame through the stable overlay-layer marker (independent
             // of any slot wrapper around this rail), then read the sidebar track
@@ -206,18 +205,36 @@ window.__ModuleLoader__.load({
                   w = col.getBoundingClientRect().width
                 }
               }
-              if (w > 0) setLeft((prev) => (prev === w + GAP ? prev : w + GAP))
+              // Apply directly to the DOM (no React state) so the rail follows
+              // the sidebar within the same frame.
+              if (w > 0 && railRef.current) {
+                railRef.current.style.left = (w + GAP) + 'px'
+              }
             }
             // Hide the rail while the trajectory view is the active conversation view.
             const traj = !!document.querySelector('[data-trajectory-scroll]')
             setIsTrajectory((prev) => (prev === traj ? prev : traj))
           }
 
-          check()
+          measure()
 
-          const id = setInterval(check, 250)
+          // ResizeObserver fires after layout but before paint, so a synchronous
+          // style.left write lands in the same frame (0-frame follow).
+          let ro
+          const overlayEl = document.querySelector('[data-shell-overlay]')
+          const frameEl = overlayEl && overlayEl.parentElement
+          const colEl = frameEl && frameEl.firstElementChild
+          if (colEl && typeof ResizeObserver === 'function') {
+            ro = new ResizeObserver(measure)
+            ro.observe(colEl)
+          }
+
+          // Low-frequency fallback for trajectory detection and width (in case
+          // ResizeObserver is unavailable).
+          const id = setInterval(measure, 400)
 
           return () => {
+            if (ro) ro.disconnect()
             clearInterval(id)
           }
         }, [hasTurns])
@@ -285,7 +302,6 @@ window.__ModuleLoader__.load({
         return React.createElement('div', {
           ref: railRef,
           className: 'dso-outline-rail',
-          style: { left: left + 'px' },
           onMouseLeave: () => setHover(-1),
         },
           topButton,
