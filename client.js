@@ -171,49 +171,54 @@ window.__ModuleLoader__.load({
           const face = binding.session
           const read = () => setTurns(buildTurns(face.getSnapshot()))
           read()
-          return face.subscribe(read)
+          const unsub = face.subscribe(read)
+          // Auto-load folded/older history so the outline recognizes every turn
+          // without a manual "load more".
+          ;(async () => {
+            try {
+              for (let i = 0; i < 50; i++) {
+                const snap = face.getSnapshot()
+                if (!snap.hasMore) break
+                await face.loadOlder()
+              }
+            } catch (e) {}
+          })()
+          return unsub
         }, [currentId])
 
         React.useEffect(() => {
           if (!hasTurns) return
 
           const check = () => {
-            // Track the sidebar width so the rail follows drag / collapse / resize.
-            const el = railRef.current
-            if (el) {
-              const frame = el.parentElement && el.parentElement.parentElement
-              if (frame) {
-                let w = 0
+            if (typeof document === 'undefined') return
+            // Find the frame through the stable overlay-layer marker (independent
+            // of any slot wrapper around this rail), then read the sidebar track
+            // width from the frame's inline grid-template-columns.
+            const overlay = document.querySelector('[data-shell-overlay]')
+            const frame = overlay && overlay.parentElement
+            if (frame) {
+              let w = 0
+              if (frame.style && frame.style.gridTemplateColumns) {
+                w = parseFloat(frame.style.gridTemplateColumns) || 0
+              }
+              if (!w) {
                 const col = frame.firstElementChild
                 if (col && typeof col.getBoundingClientRect === 'function') {
                   w = col.getBoundingClientRect().width
                 }
-                if (!w && frame.style && frame.style.gridTemplateColumns) {
-                  w = parseFloat(frame.style.gridTemplateColumns) || 0
-                }
-                if (w > 0) setLeft((prev) => (prev === w + GAP ? prev : w + GAP))
               }
+              if (w > 0) setLeft((prev) => (prev === w + GAP ? prev : w + GAP))
             }
             // Hide the rail while the trajectory view is the active conversation view.
-            const traj = typeof document !== 'undefined' && !!document.querySelector('[data-trajectory-scroll]')
+            const traj = !!document.querySelector('[data-trajectory-scroll]')
             setIsTrajectory((prev) => (prev === traj ? prev : traj))
           }
 
           check()
 
-          let ro
-          const el = railRef.current
-          const frame = el && el.parentElement && el.parentElement.parentElement
-          const col = frame && frame.firstElementChild
-          if (col && typeof ResizeObserver === 'function') {
-            ro = new ResizeObserver(check)
-            ro.observe(col)
-          }
-
-          const id = setInterval(check, 400)
+          const id = setInterval(check, 250)
 
           return () => {
-            if (ro) ro.disconnect()
             clearInterval(id)
           }
         }, [hasTurns])
