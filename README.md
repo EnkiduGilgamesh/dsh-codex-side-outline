@@ -36,24 +36,25 @@ in the npm package.
 
 ## Install
 
-Install into the **default `web` profile** with the `dsh` CLI (from a directory
-containing this package):
+Install from GitHub into the **default `web` profile**:
 
 ```sh
-dsh plugin --profile web add ./dsh-codex-side-outline
+dsh plugin --profile web add github:EnkiduGilgamesh/dsh-codex-side-outline
+dsh web
 ```
 
-Or install straight from a git host:
+Or clone to a local directory first, then install from there:
 
 ```sh
-dsh plugin --profile web add github:you/dsh-codex-side-outline
+git clone git@github.com:EnkiduGilgamesh/dsh-codex-side-outline.git
+cd dsh-codex-side-outline
+dsh plugin --profile web add .
 ```
 
-Verify the layer, then boot:
+Verify the layer before booting (optional):
 
 ```sh
 dsh --profile web --dump-config   # shows a "# == dsh-codex-side-outline" layer
-dsh web
 ```
 
 > ⚠️ **Restart required.** The web app composes its client bundle roster at

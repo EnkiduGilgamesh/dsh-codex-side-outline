@@ -26,23 +26,25 @@
 
 ## 安装
 
-在包含本包的目录下，用 `dsh` CLI 安装到**默认的 `web` profile**：
+从 GitHub 安装到**默认的 `web` profile**：
 
 ```sh
-dsh plugin --profile web add ./dsh-codex-side-outline
+dsh plugin --profile web add github:EnkiduGilgamesh/dsh-codex-side-outline
+dsh web
 ```
 
-或者直接从 git 仓库安装：
+或者先 clone 到本地目录，再从本地目录安装：
 
 ```sh
-dsh plugin --profile web add github:you/dsh-codex-side-outline
+git clone git@github.com:EnkiduGilgamesh/dsh-codex-side-outline.git
+cd dsh-codex-side-outline
+dsh plugin --profile web add .
 ```
 
-验证补丁层，然后启动：
+（可选）启动前验证补丁层：
 
 ```sh
 dsh --profile web --dump-config   # 应显示 "# == dsh-codex-side-outline" 层
-dsh web
 ```
 
 > ⚠️ **必须重启才能生效。** Web 应用在启动时才会组装 client bundle 列表。执行
