@@ -9,7 +9,7 @@ window.__ModuleLoader__.load({
     Object.defineProperty(exports, Symbol.toStringTag, { value: "Module" });
     const React = require("react");
 
-    const PER = 20
+    const PER = 26
     const GAP = 6
     const WIDTHS = [40, 33, 26, 20, 14]
     const ITEM_H = 14
@@ -113,7 +113,7 @@ window.__ModuleLoader__.load({
       '.dso-outline-btn{width:24px;height:' + BTN_H + 'px;margin:0;padding:0;border:none;background:transparent;color:var(--dsw-alias-label-secondary);opacity:.7;cursor:pointer;font-size:11px;line-height:1;display:flex;align-items:center;justify-content:flex-start;transition:opacity .12s ease;}',
       '.dso-outline-btn:hover{opacity:1;}',
       '.dso-outline-btn:disabled{opacity:.2;cursor:default;}',
-      '.dso-outline-card{position:absolute;left:52px;transform:translateY(-50%);min-width:150px;max-width:190px;padding:8px 10px;background:var(--dsw-alias-bg-overlay);border:1px solid var(--dsw-alias-border-l1);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.22);z-index:9991;font-size:12px;line-height:1.5;pointer-events:none;}',
+      '.dso-outline-card{position:absolute;left:52px;transform:translateY(-50%);min-width:225px;max-width:285px;padding:8px 12px;background:var(--dsw-alias-bg-overlay);border:1px solid var(--dsw-alias-border-l1);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.22);z-index:9991;font-size:12px;line-height:1.5;pointer-events:none;}',
       '.dso-outline-q{color:var(--dsw-alias-label-primary);font-weight:600;border-left:2px solid var(--dsw-alias-brand-primary);padding-left:6px;margin-bottom:4px;word-break:break-all;}',
       '.dso-outline-a{color:var(--dsw-alias-label-secondary);padding-left:8px;word-break:break-all;}'
     ].join('\n')
@@ -121,8 +121,6 @@ window.__ModuleLoader__.load({
     const inject = ['slots', 'sessions']
 
     function apply(ctx) {
-      const timer = ctx.get('timer')
-
       ctx.effect(() => {
         const style = document.createElement('style')
         style.dataset.plugin = 'dsh-codex-side-outline'
@@ -149,6 +147,7 @@ window.__ModuleLoader__.load({
         const [left, setLeft] = React.useState(286)
         const [overflow, setOverflow] = React.useState(false)
         const [scroll, setScroll] = React.useState({ top: 0, atTop: true, atBottom: false })
+        const [isTrajectory, setIsTrajectory] = React.useState(false)
         const railRef = React.useRef(null)
         const listRef = React.useRef(null)
         const hasTurns = turns.length > 0
@@ -177,27 +176,46 @@ window.__ModuleLoader__.load({
 
         React.useEffect(() => {
           if (!hasTurns) return
-          const measure = () => {
+
+          const check = () => {
+            // Track the sidebar width so the rail follows drag / collapse / resize.
             const el = railRef.current
-            if (!el) return
-            const frame = el.parentElement && el.parentElement.parentElement
-            if (!frame) return
-            let w = 0
-            const col = frame.firstElementChild
-            if (col && typeof col.getBoundingClientRect === 'function') {
-              w = col.getBoundingClientRect().width
+            if (el) {
+              const frame = el.parentElement && el.parentElement.parentElement
+              if (frame) {
+                let w = 0
+                const col = frame.firstElementChild
+                if (col && typeof col.getBoundingClientRect === 'function') {
+                  w = col.getBoundingClientRect().width
+                }
+                if (!w && frame.style && frame.style.gridTemplateColumns) {
+                  w = parseFloat(frame.style.gridTemplateColumns) || 0
+                }
+                if (w > 0) setLeft((prev) => (prev === w + GAP ? prev : w + GAP))
+              }
             }
-            if (!w && frame.style && frame.style.gridTemplateColumns) {
-              w = parseFloat(frame.style.gridTemplateColumns) || 0
-            }
-            if (w > 0) setLeft((prev) => (prev === w + GAP ? prev : w + GAP))
+            // Hide the rail while the trajectory view is the active conversation view.
+            const traj = typeof document !== 'undefined' && !!document.querySelector('[data-trajectory-scroll]')
+            setIsTrajectory((prev) => (prev === traj ? prev : traj))
           }
-          measure()
-          let dispose
-          if (timer && typeof timer.interval === 'function') {
-            dispose = timer.interval(measure, 350)
+
+          check()
+
+          let ro
+          const el = railRef.current
+          const frame = el && el.parentElement && el.parentElement.parentElement
+          const col = frame && frame.firstElementChild
+          if (col && typeof ResizeObserver === 'function') {
+            ro = new ResizeObserver(check)
+            ro.observe(col)
           }
-          return () => { if (dispose) dispose() }
+
+          const id = setInterval(check, 400)
+
+          return () => {
+            if (ro) ro.disconnect()
+            clearInterval(id)
+          }
         }, [hasTurns])
 
         React.useEffect(() => {
@@ -205,7 +223,7 @@ window.__ModuleLoader__.load({
           if (el) setOverflow(el.scrollHeight > el.clientHeight)
         }, [turns])
 
-        if (!hasTurns) return null
+        if (!hasTurns || isTrajectory) return null
 
         const handleScroll = () => {
           const el = listRef.current
