@@ -1,0 +1,40 @@
+{
+  "name": "dsh-conversation-outline",
+  "version": "1.0.0",
+  "description": "DeepSeek Harness plugin: a hoverable/clickable outline rail on the left of the chat column (one marker per turn, summary card on hover, click to jump).",
+  "type": "module",
+  "main": "index.js",
+  "exports": {
+    ".": {
+      "default": "./index.js"
+    },
+    "./client": {
+      "default": "./client.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "index.js",
+    "client.js",
+    "cordis.patch.yml"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "inject": [
+        "@deepseek-ai/dsh-client-runtime",
+        "@deepseek-ai/dsh-client-ui-theme"
+      ],
+      "platform": "web"
+    }
+  },
+  "license": "MIT",
+  "peerDependencies": {
+    "react": "^18.2.0",
+    "@deepseek-ai/cordis": "^4.0.1",
+    "@deepseek-ai/dsh-client-runtime": "^0.1.0",
+    "@deepseek-ai/dsh-client-ui-theme": "^0.1.0"
+  }
+}
