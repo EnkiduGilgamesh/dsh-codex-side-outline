@@ -169,21 +169,20 @@ window.__ModuleLoader__.load({
             return
           }
           const face = binding.session
-          const read = () => setTurns(buildTurns(face.getSnapshot()))
+          let loadCount = 0
+          const read = () => {
+            const snap = face.getSnapshot()
+            setTurns(buildTurns(snap))
+            // Auto-load folded/older history: trigger one page per snapshot flush
+            // while the session is open and more history remains. Waiting for the
+            // open state avoids the fire-once race that ran before the window opened.
+            if (snap.openState === 'open' && snap.hasMore && !snap.loadingOlder && loadCount < 50) {
+              loadCount++
+              face.loadOlder().catch(() => {})
+            }
+          }
           read()
-          const unsub = face.subscribe(read)
-          // Auto-load folded/older history so the outline recognizes every turn
-          // without a manual "load more".
-          ;(async () => {
-            try {
-              for (let i = 0; i < 50; i++) {
-                const snap = face.getSnapshot()
-                if (!snap.hasMore) break
-                await face.loadOlder()
-              }
-            } catch (e) {}
-          })()
-          return unsub
+          return face.subscribe(read)
         }, [currentId])
 
         React.useEffect(() => {
