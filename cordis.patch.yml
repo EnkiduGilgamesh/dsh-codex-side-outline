@@ -1,0 +1,10 @@
+# The dsh-conversation-outline bundle patch.
+#
+# Applied after the base/web layers. The row references this package by name so
+# Node resolution finds the installed code: the host half is a no-op entry
+# (index.js), and the browser half (client.js) is discovered through the
+# package's `dsh.client` manifest.
+
+- insert:
+    - id: conversation-outline
+      name: dsh-conversation-outline
