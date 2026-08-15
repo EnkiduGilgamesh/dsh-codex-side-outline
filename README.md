@@ -13,6 +13,8 @@ sidebar.
   - first line = the user question (bold, brand accent bar);
   - following lines = the agent reply, wrapped to about 3 lines of ~20
     characters each (older content is ellipsized).
+- **Click to jump** — clicking a line scrolls the conversation to that turn's
+  user message.
 
 ## How it works
 
@@ -28,6 +30,10 @@ sidebar.
     `getSnapshot().nodes` carries the folded `ConversationNode[]`;
   - `user` nodes contribute the question text (`content` text blocks), and
     `assistant` nodes contribute the reply text (`blocks` of `kind: 'text'`).
+- **Jump:** each turn's `seq` is mapped to the chat node key via
+  `snapshot.chat.nodes.values()` (`anchorSeq` → `key`); clicking scrolls the
+  row carrying `data-chat-anchor-key` inside the `[data-conversation-scroll]`
+  scrollport.
 - **Styling:** package-local CSS via `styles.insert`, colored with theme CSS
   variables (`--dsw-alias-*`), so light/dark modes follow the active theme.
 

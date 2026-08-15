@@ -1,11 +1,13 @@
 // conversation-outline — Dynamic Cordis Plugin (Client half)
 //
 // This file is the `code.client` function body for the `outln-*` Plugin. It
-// renders a hoverable rail along the LEFT EDGE OF THE CENTER (conversation)
-// COLUMN, adjacent to the sidebar: one gray short line per conversation turn,
-// stacked top-to-bottom. Hovering a line highlights it and reveals a summary
-// card whose first line is the user question and whose remaining lines (up to
-// 3, ~20 characters each) are the agent reply.
+// renders a hoverable + clickable rail along the LEFT EDGE OF THE CENTER
+// (conversation) COLUMN, adjacent to the sidebar: one gray short line per
+// conversation turn, stacked top-to-bottom.
+//
+// - Hover a line: it highlights and shows a summary card (first line = user
+//   question; up to 3 lines of ~20 chars = agent reply).
+// - Click a line: the conversation scrolls to that turn's user message.
 //
 // Placement: `shell.overlay` (frame-wide floating layer) so the rail stays
 // outside every column's scroll container. The rail's horizontal offset is
@@ -13,7 +15,9 @@
 // tracks sidebar drag / collapse / window-resize. Conversation data is read
 // through the `sessions` service: `useSessions` yields the current session id,
 // `sessions.binding(id).session` exposes an ObservableSnapshot whose
-// `getSnapshot().nodes` carries the folded ConversationNode list.
+// `getSnapshot().nodes` carries the folded ConversationNode list. The jump
+// maps each turn's seq to the chat node key and scrolls the row carrying
+// `data-chat-anchor-key` inside `[data-conversation-scroll]`.
 
 const PER = 20
 const GAP = 6
@@ -38,7 +42,23 @@ function textOfAssistant(node) {
   return parts.join(' ').replace(/\s+/g, ' ').trim()
 }
 
+function chatKeyBySeq(snapshot) {
+  const map = new Map()
+  const store = snapshot && snapshot.chat && snapshot.chat.nodes
+  if (store && typeof store.values === 'function') {
+    const values = store.values()
+    for (let i = 0; i < values.length; i++) {
+      const n = values[i]
+      if (n && typeof n.anchorSeq === 'number' && typeof n.key === 'string' && !map.has(n.anchorSeq)) {
+        map.set(n.anchorSeq, n.key)
+      }
+    }
+  }
+  return map
+}
+
 function buildTurns(snapshot) {
+  const keyBySeq = chatKeyBySeq(snapshot)
   const nodes = snapshot && snapshot.nodes ? snapshot.nodes : []
   const turns = []
   let current = null
@@ -46,13 +66,13 @@ function buildTurns(snapshot) {
     const n = nodes[i]
     if (!n) continue
     if (n.kind === 'user') {
-      current = { question: textOfBlocks(n.content), reply: '' }
+      current = { question: textOfBlocks(n.content), reply: '', key: keyBySeq.get(n.seq) || '' }
       turns.push(current)
     } else if (n.kind === 'assistant') {
       const text = textOfAssistant(n)
       if (!text) continue
       if (!current) {
-        current = { question: '', reply: text }
+        current = { question: '', reply: text, key: keyBySeq.get(n.seq) || '' }
         turns.push(current)
       } else {
         current.reply = current.reply ? current.reply + ' ' + text : text
@@ -72,11 +92,29 @@ function clampLines(text, perLine, maxLines) {
   return lines
 }
 
+function scrollToKey(key) {
+  if (!key || typeof document === 'undefined') return false
+  let row = null
+  const all = document.querySelectorAll('[data-chat-anchor-key]')
+  for (let i = 0; i < all.length; i++) {
+    if (all[i].getAttribute('data-chat-anchor-key') === key) { row = all[i]; break }
+  }
+  if (!row) return false
+  const scrollport = typeof row.closest === 'function' ? row.closest('[data-conversation-scroll]') : null
+  if (scrollport) {
+    const top = row.getBoundingClientRect().top - scrollport.getBoundingClientRect().top
+    scrollport.scrollTop += top - 24
+  } else if (typeof row.scrollIntoView === 'function') {
+    row.scrollIntoView({ block: 'center', behavior: 'smooth' })
+  }
+  return true
+}
+
 const css = [
   '.dso-outline-rail{position:absolute;top:50%;transform:translateY(-50%);display:flex;flex-direction:column;align-items:flex-start;gap:7px;z-index:9990;pointer-events:auto;}',
-  '.dso-outline-item{position:relative;display:flex;align-items:center;padding:2px 0;}',
+  '.dso-outline-item{position:relative;display:flex;align-items:center;padding:2px 0;cursor:pointer;}',
   '.dso-outline-line{width:26px;height:3px;border-radius:2px;background:var(--dsw-alias-label-secondary);opacity:.45;transition:width .12s ease,opacity .12s ease,background .12s ease;}',
-  '.dso-outline-item.is-hover .dso-outline-line{width:42px;height:4px;opacity:1;background:var(--dsw-alias-brand-primary);}',
+  '.dso-outline-item:hover .dso-outline-line,.dso-outline-item.is-hover .dso-outline-line{width:42px;height:4px;opacity:1;background:var(--dsw-alias-brand-primary);}',
   '.dso-outline-card{position:absolute;left:50px;top:50%;transform:translateY(-50%);min-width:150px;max-width:190px;padding:8px 10px;background:var(--dsw-alias-bg-overlay);border:1px solid var(--dsw-alias-border-l1);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.22);z-index:9991;font-size:12px;line-height:1.5;}',
   '.dso-outline-q{color:var(--dsw-alias-label-primary);font-weight:600;border-left:2px solid var(--dsw-alias-brand-primary);padding-left:6px;margin-bottom:4px;word-break:break-all;}',
   '.dso-outline-a{color:var(--dsw-alias-label-secondary);padding-left:8px;word-break:break-all;}'
@@ -164,6 +202,7 @@ return {
         className: 'dso-outline-item' + (i === hover ? ' is-hover' : ''),
         onMouseEnter: () => setHover(i),
         onMouseLeave: () => setHover(-1),
+        onClick: () => scrollToKey(t.key),
       },
         React.createElement('div', { className: 'dso-outline-line' }),
         i === hover ? React.createElement(Card, { turn: t }) : null,
